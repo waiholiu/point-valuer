@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Plane, Info, Calculator, CheckCircle, XCircle, 
   AlertCircle, TrendingUp, Sparkles, Loader2, MessageSquare, 
-  ChevronRight, ArrowRight
+  ChevronRight, ArrowRight, History, Trash2
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -28,6 +28,10 @@ const App = () => {
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState(null);
+  // Search history is kept only in component state (in-memory), so it
+  // resets whenever the page is refreshed, per the feature request.
+  const [history, setHistory] = useState([]);
+  const lastHistoryEntryRef = useRef(null);
 
   const selectedProgram = PROGRAMS.find(p => p.id === selectedProgramId);
 
@@ -56,6 +60,37 @@ const App = () => {
 
     return { cpp: cpp.toFixed(2), rating, color, bgColor, icon };
   }, [cashPrice, pointsCost, selectedProgram]);
+
+  // Record a completed search in the (in-memory only) history table, once
+  // the user has paused typing, so the search can be compared later.
+  useEffect(() => {
+    if (!stats) return;
+
+    const timeoutId = setTimeout(() => {
+      const key = `${selectedProgram.id}-${cashPrice}-${pointsCost}`;
+      if (lastHistoryEntryRef.current === key) return;
+      lastHistoryEntryRef.current = key;
+
+      const entry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        programName: selectedProgram.name,
+        cashPrice,
+        pointsCost,
+        cpp: stats.cpp,
+        rating: stats.rating,
+        timestamp: new Date(),
+      };
+
+      setHistory(prev => [entry, ...prev]);
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [stats, selectedProgram, cashPrice, pointsCost]);
+
+  const clearHistory = () => {
+    setHistory([]);
+    lastHistoryEntryRef.current = null;
+  };
 
   const fetchAiAnalysis = async () => {
     if (!stats) return;
@@ -245,6 +280,51 @@ const App = () => {
             Always subtract taxes & fees from cash price for accuracy
           </p>
         </div>
+
+        {/* Search History */}
+        {history.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-slate-400" />
+                <h3 className="font-bold text-sm uppercase tracking-wide text-slate-700">Search History</h3>
+              </div>
+              <button
+                onClick={clearHistory}
+                className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 mb-3">
+              Kept only in this browser session &mdash; cleared when you refresh the page.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="text-[10px] uppercase text-slate-400 border-b border-slate-100">
+                    <th className="py-2 pr-2 font-bold">Program</th>
+                    <th className="py-2 pr-2 font-bold">Cash</th>
+                    <th className="py-2 pr-2 font-bold">Points</th>
+                    <th className="py-2 pr-2 font-bold">CPP</th>
+                    <th className="py-2 font-bold">Rating</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map(entry => (
+                    <tr key={entry.id} className="border-b border-slate-50 last:border-0">
+                      <td className="py-2 pr-2 text-slate-700">{entry.programName}</td>
+                      <td className="py-2 pr-2 text-slate-700">${entry.cashPrice}</td>
+                      <td className="py-2 pr-2 text-slate-700">{entry.pointsCost}</td>
+                      <td className="py-2 pr-2 font-semibold text-slate-800">{entry.cpp}c</td>
+                      <td className="py-2 text-slate-700">{entry.rating}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
