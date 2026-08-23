@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Plane, Info, Calculator, CheckCircle, XCircle, 
   AlertCircle, TrendingUp, Sparkles, Loader2, MessageSquare, 
-  ChevronRight, ArrowRight, History, Trash2
+  ChevronRight, ArrowRight, History, Trash2, Save
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -31,7 +31,6 @@ const App = () => {
   // Search history is kept only in component state (in-memory), so it
   // resets whenever the page is refreshed, per the feature request.
   const [history, setHistory] = useState([]);
-  const lastHistoryEntryRef = useRef(null);
 
   const selectedProgram = PROGRAMS.find(p => p.id === selectedProgramId);
 
@@ -61,35 +60,24 @@ const App = () => {
     return { cpp: cpp.toFixed(2), rating, color, bgColor, icon };
   }, [cashPrice, pointsCost, selectedProgram]);
 
-  // Record a completed search in the (in-memory only) history table, once
-  // the user has paused typing, so the search can be compared later.
-  useEffect(() => {
+  const saveCalculationToHistory = () => {
     if (!stats) return;
 
-    const timeoutId = setTimeout(() => {
-      const key = `${selectedProgram.id}-${cashPrice}-${pointsCost}`;
-      if (lastHistoryEntryRef.current === key) return;
-      lastHistoryEntryRef.current = key;
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      programName: selectedProgram.name,
+      cashPrice,
+      pointsCost,
+      cpp: stats.cpp,
+      rating: stats.rating,
+      timestamp: new Date(),
+    };
 
-      const entry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        programName: selectedProgram.name,
-        cashPrice,
-        pointsCost,
-        cpp: stats.cpp,
-        rating: stats.rating,
-        timestamp: new Date(),
-      };
-
-      setHistory(prev => [entry, ...prev]);
-    }, 800);
-
-    return () => clearTimeout(timeoutId);
-  }, [stats, selectedProgram, cashPrice, pointsCost]);
+    setHistory(prev => [entry, ...prev]);
+  };
 
   const clearHistory = () => {
     setHistory([]);
-    lastHistoryEntryRef.current = null;
   };
 
   const fetchAiAnalysis = async () => {
@@ -223,17 +211,25 @@ const App = () => {
                   </div>
                 </div>
 
-                <button 
-                  onClick={fetchAiAnalysis}
-                  disabled={isAnalyzing}
-                  className="mt-4 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                >
-                  {isAnalyzing ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Consulting Expert...</>
-                  ) : (
-                    <><Sparkles className="w-5 h-5" /> ✨ Gemini Expert Analysis</>
-                  )}
-                </button>
+                <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={saveCalculationToHistory}
+                    className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
+                  >
+                    <Save className="w-5 h-5" /> Save to History
+                  </button>
+                  <button 
+                    onClick={fetchAiAnalysis}
+                    disabled={isAnalyzing}
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+                  >
+                    {isAnalyzing ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Consulting Expert...</>
+                    ) : (
+                      <><Sparkles className="w-5 h-5" /> ✨ Gemini Expert Analysis</>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
