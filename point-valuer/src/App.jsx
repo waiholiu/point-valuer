@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Plane, Info, Calculator, CheckCircle, XCircle, 
-  AlertCircle, TrendingUp, Sparkles, Loader2, MessageSquare, 
-  ChevronRight, ArrowRight, History, Trash2, Save
+  AlertCircle, TrendingUp, ChevronRight, ArrowRight, History, Trash2, Save
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
@@ -19,15 +18,10 @@ const PROGRAMS = [
   { id: 'emirates', name: 'Emirates Skywards', currency: 'AED/AUD', benchmark: 1.2, min: 0.9, tips: 'High surcharges; look for upgrades instead.' },
 ];
 
-const apiKey = ""; // Environment provided key
-
 const App = () => {
   const [cashPrice, setCashPrice] = useState('');
   const [pointsCost, setPointsCost] = useState('');
   const [selectedProgramId, setSelectedProgramId] = useState(PROGRAMS[0].id);
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState(null);
   // Search history is kept only in component state (in-memory), so it
   // resets whenever the page is refreshed, per the feature request.
   const [history, setHistory] = useState([]);
@@ -80,48 +74,6 @@ const App = () => {
     setHistory([]);
   };
 
-  const fetchAiAnalysis = async () => {
-    if (!stats) return;
-    setIsAnalyzing(true);
-    setError(null);
-
-    const systemPrompt = "You are a world-class frequent flyer expert. Analyze flight redemption deals based on Cents Per Point (CPP). Today is May 2026. Give punchy, strategic advice on whether to book or save points for better value (like Business/First class). Keep it under 100 words.";
-    const userQuery = `Program: ${selectedProgram.name}. Cash Price: $${cashPrice}. Points: ${pointsCost}. Calculated CPP: ${stats.cpp}c. Rating: ${stats.rating}. Current benchmark for this program is ${selectedProgram.benchmark}c. Should I do it?`;
-
-    const fetchWithRetry = async (retries = 0) => {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-          })
-        });
-        
-        if (!response.ok) throw new Error('API Error');
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text;
-      } catch (err) {
-        if (retries < 5) {
-          const delay = Math.pow(2, retries) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return fetchWithRetry(retries + 1);
-        }
-        throw err;
-      }
-    };
-
-    try {
-      const text = await fetchWithRetry();
-      setAiAnalysis(text);
-    } catch (err) {
-      setError("The Expert is busy right now. Please try again in a moment.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-xl mx-auto space-y-6">
@@ -145,10 +97,7 @@ const App = () => {
             <label className="text-sm font-medium text-slate-700">Airline Program</label>
             <select 
               value={selectedProgramId}
-              onChange={(e) => {
-                setSelectedProgramId(e.target.value);
-                setAiAnalysis(null);
-              }}
+              onChange={(e) => setSelectedProgramId(e.target.value)}
               className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
             >
               {PROGRAMS.map(p => (
@@ -166,7 +115,7 @@ const App = () => {
                   type="number"
                   placeholder="956"
                   value={cashPrice}
-                  onChange={(e) => { setCashPrice(e.target.value); setAiAnalysis(null); }}
+                  onChange={(e) => setCashPrice(e.target.value)}
                   className="w-full pl-8 pr-3 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
               </div>
@@ -177,7 +126,7 @@ const App = () => {
                 type="number"
                 placeholder="55200"
                 value={pointsCost}
-                onChange={(e) => { setPointsCost(e.target.value); setAiAnalysis(null); }}
+                onChange={(e) => setPointsCost(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
               />
             </div>
@@ -211,51 +160,21 @@ const App = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                <div className="mt-4">
                   <button
                     onClick={saveCalculationToHistory}
                     className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95"
                   >
                     <Save className="w-5 h-5" /> Save to History
                   </button>
-                  <button 
-                    onClick={fetchAiAnalysis}
-                    disabled={isAnalyzing}
-                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-                  >
-                    {isAnalyzing ? (
-                      <><Loader2 className="w-5 h-5 animate-spin" /> Consulting Expert...</>
-                    ) : (
-                      <><Sparkles className="w-5 h-5" /> ✨ Gemini Expert Analysis</>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>
-
-            {/* AI Response Block */}
-            {aiAnalysis && (
-              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 animate-in zoom-in-95 duration-300">
-                <div className="flex items-center gap-2 mb-3 text-indigo-700">
-                  <MessageSquare className="w-5 h-5" />
-                  <span className="font-bold text-sm uppercase tracking-wide">Expert Insight</span>
-                </div>
-                <p className="text-indigo-900 leading-relaxed italic text-sm">
-                  "{aiAnalysis}"
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-red-700 text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" /> {error}
-              </div>
-            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-slate-200 shadow-sm">
             <Calculator className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-400 font-medium italic">Enter values above for the math & ✨ AI review</p>
+            <p className="text-slate-400 font-medium italic">Enter values above to calculate the value of your points</p>
           </div>
         )}
 
