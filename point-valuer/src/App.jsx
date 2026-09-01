@@ -86,7 +86,7 @@ const App = () => {
             <div className="p-2 bg-indigo-600 rounded-lg text-white">
               <TrendingUp className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">PointValuer</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Point Valuing system</h1>
           </div>
           <p className="text-slate-500 text-sm">Maxing out your travel points in 2026.</p>
         </div>
